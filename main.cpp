@@ -1,3 +1,4 @@
+#include <cstring>
 #include <iostream>
 #include <fstream>
 
@@ -8,30 +9,36 @@ int main() {
         return 1;
     }
 
-      char buffer[8];
-      while (true) {
-          file.read(buffer, sizeof(buffer));
-          std::streamsize n = file.gcount();
+    char buffer[8];
+    std::string currentLine;
 
-          // If we read some bytes, print them
-          if (n > 0) {
-              std::cout << "read: ";
-              std::cout.write(buffer, n);
-              std::cout << std::endl;
-          }
 
-          // If we hit EOF, exit the program
-          if (file.eof()) {
-              break;
-          }
+    while (true) {
+        file.read(buffer, sizeof(buffer));
+        std::streamsize n = file.gcount();
 
-          // If there's any other error, report it
-          if (file.fail()) {
-              std::cout << "Error reading file" << std::endl;
-              return 1;
-          }
-      }
+        if (n > 0) {
+            const char* found = static_cast<const char*>(memchr(buffer, '\n', n));
+            if (found) {
+                currentLine.append(buffer,  found-buffer);
+                std::cout << "read: " << currentLine << std::endl;
+                currentLine = std::string(found+1,  n - (found-buffer) - 1);
+            } else {
+                currentLine.append(buffer,  n);
+            }
+        }
 
-      file.close();
-      return 0;
-  }
+        if (file.eof()) {
+            break;
+        }
+
+        if (file.fail()) {
+            std::cout << "Error reading file" << std::endl;
+            return 1;
+        }
+    }
+    if (!currentLine.empty())
+        std::cout << "read: " << currentLine << std::endl;
+    file.close();
+    return 0;
+}
