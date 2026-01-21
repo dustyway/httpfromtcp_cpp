@@ -3,7 +3,7 @@
 
 class LineReader {
 public:
-    explicit LineReader(std::istream& stream) : _istream(stream) {}
+    explicit LineReader(int fd) : _fd(fd) {}
 
     bool getLine(std::string& out) {
         while (true) {
@@ -17,8 +17,13 @@ public:
             }
 
             char buffer[8];
-            _istream.read(buffer, sizeof(buffer));
-            std::streamsize n = _istream.gcount();
+            ssize_t n = read(_fd, buffer, sizeof(buffer));
+
+            if (n < 0)
+            {
+                std::cout << "error: " << strerror(errno) << std::endl;
+                return false;
+            }
 
             if (n == 0) {
                 if (!_stash.empty()) {
@@ -29,17 +34,12 @@ public:
                 return false;
             }
 
-            if (_istream.bad()) {
-                std::cout << "error: read failure" << std::endl;
-                return false;
-            }
-
             _stash.append(buffer, static_cast<std::size_t>(n));
         }
     }
 
 private:
-    std::istream& _istream;
+    int _fd;
     std::string _stash;
 };
 
