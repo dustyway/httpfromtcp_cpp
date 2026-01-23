@@ -4,7 +4,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include "LineReader.hpp"
+#include "Request.hpp"
 
 #define PORT 42069
 
@@ -55,13 +55,20 @@ int main() {
 
         std::cout << "Accepted connection from " << client_ip << ":" << client_port << std::endl;
 
-        LineReader reader(conn);
-        std::string line;
-        while (reader.getLine(line)) {
-            std::cout << line << std::endl;
+        std::string errorMsg;
+        Request* r = Request::requestFromSocket(conn, &errorMsg);
+        if (r == NULL) {
+            std::cerr << "error: " << errorMsg << std::endl;
+            close(conn);
+            continue;
         }
 
-        std::cout << "Connection to " << client_ip << ":" << client_port << " closed" << std::endl;
+        std::cout << "Request line:" << std::endl;
+        std::cout << "- Method: " << r->requestLine.method << std::endl;
+        std::cout << "- Target: " << r->requestLine.requestTarget << std::endl;
+        std::cout << "- Version: " << r->requestLine.httpVersion << std::endl;
+
+        delete r;
         close(conn);
     }
     close(listener);

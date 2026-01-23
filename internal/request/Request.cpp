@@ -1,4 +1,6 @@
 #include "Request.hpp"
+#include <sys/socket.h>
+#include <cstring>
 
 const char* Request::ERROR_MALFORMED_REQUEST_LINE = "malformed request-line";
 const char* Request::ERROR_REQUEST_IN_ERROR_STATE = "request in error state";
@@ -94,4 +96,40 @@ int Request::parse(const std::string& data, std::string* errorMsg) {
                 return totalRead;
         }
     }
+}
+
+Request* Request::requestFromSocket(int socketFd, std::string* errorMsg) {
+    Request* request = new Request();
+
+    char buf[1024];
+    int bufLen = 0;
+
+    while (!request->done()) {
+        ssize_t n = recv(socketFd, buf + bufLen, sizeof(buf) - bufLen, 0);
+        if (n < 0) {
+            if (errorMsg) *errorMsg = "socket read error";
+            delete request;
+            return NULL;
+        }
+        if (n == 0) {
+            if (errorMsg) *errorMsg = "connection closed";
+            delete request;
+            return NULL;
+        }
+
+        bufLen += n;
+
+        std::string data(buf, bufLen);
+        int readN = request->parse(data, errorMsg);
+        if (readN < 0) {
+            delete request;
+            return NULL;
+        }
+
+        // Shift buffer to remove parsed data
+        std::memmove(buf, buf + readN, bufLen - readN);
+        bufLen -= readN;
+    }
+
+    return request;
 }

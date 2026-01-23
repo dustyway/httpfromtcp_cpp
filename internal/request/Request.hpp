@@ -37,6 +37,10 @@ public:
     static const char* ERROR_MALFORMED_REQUEST_LINE;
     static const char* ERROR_REQUEST_IN_ERROR_STATE;
 
+    // Read and parse a request from a socket
+    // Returns NULL on error, sets errorMsg if provided
+    static Request* requestFromSocket(int socketFd, std::string* errorMsg);
+
 private:
     ParserState::State state;
 

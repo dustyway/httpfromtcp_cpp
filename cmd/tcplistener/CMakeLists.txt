@@ -1,2 +1,2 @@
 add_executable(httpfromtcp main.cpp)
-target_include_directories(httpfromtcp PUBLIC .)
+target_link_libraries(httpfromtcp ${REQUEST_LIBRARY})
