@@ -8,6 +8,26 @@ const char* Request::SEPARATOR = "\r\n";
 
 Request::Request() : state(ParserState::Init) {}
 
+const std::string& Request::getMethod() const {
+    return requestLine.method;
+}
+
+const std::string& Request::getTarget() const {
+    return requestLine.requestTarget;
+}
+
+const std::string& Request::getHttpVersion() const {
+    return requestLine.httpVersion;
+}
+
+const Headers& Request::getHeaders() const {
+    return headers;
+}
+
+void Request::forEachHeader(void (*callback)(const std::string&, const std::string&, void*), void* userData) const {
+    headers.forEach(callback, userData);
+}
+
 bool Request::done() const {
     return state == ParserState::Done || state == ParserState::Error;
 }
@@ -73,22 +93,40 @@ int Request::parse(const std::string& data, std::string* errorMsg) {
     int totalRead = 0;
 
     while (true) {
+        std::string currentData = data.substr(totalRead);
         switch (state) {
             case ParserState::Error:
                 if (errorMsg) *errorMsg = ERROR_REQUEST_IN_ERROR_STATE;
                 return -1;
 
             case ParserState::Init: {
-                int n = parseRequestLine(data.substr(totalRead), &requestLine, errorMsg);
+                int n = parseRequestLine(currentData, &requestLine, errorMsg);
                 if (n < 0) {
                     state = ParserState::Error;
                     return -1;
                 }
                 if (n == 0) {
-                    return totalRead; // Need more data
+                    return 0; // Need more data
                 }
                 totalRead += n;
-                state = ParserState::Done;
+                state = ParserState::Headers;
+                break;
+            }
+
+            case ParserState::Headers: {
+                ::Headers::ParseResult result = headers.parse(currentData);
+                if (!result.error.empty()) {
+                    if (errorMsg) *errorMsg = result.error;
+                    state = ParserState::Error;
+                    return -1;
+                }
+                if (result.bytesConsumed == 0) {
+                    return totalRead; // Need more data
+                }
+                totalRead += result.bytesConsumed;
+                if (result.done) {
+                    state = ParserState::Done;
+                }
                 break;
             }
 

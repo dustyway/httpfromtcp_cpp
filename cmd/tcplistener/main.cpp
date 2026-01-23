@@ -8,6 +8,10 @@
 
 #define PORT 42069
 
+void printHeader(const std::string& name, const std::string& value, void* /*userData*/) {
+    std::cout << "- " << name << ": " << value << std::endl;
+}
+
 int main() {
     int listener = socket(AF_INET, SOCK_STREAM, 0);
     if (listener < 0) {
@@ -64,9 +68,11 @@ int main() {
         }
 
         std::cout << "Request line:" << std::endl;
-        std::cout << "- Method: " << r->requestLine.method << std::endl;
-        std::cout << "- Target: " << r->requestLine.requestTarget << std::endl;
-        std::cout << "- Version: " << r->requestLine.httpVersion << std::endl;
+        std::cout << "- Method: " << r->getMethod() << std::endl;
+        std::cout << "- Target: " << r->getTarget() << std::endl;
+        std::cout << "- Version: " << r->getHttpVersion() << std::endl;
+        std::cout << "Headers:" << std::endl;
+        r->forEachHeader(printHeader, NULL);
 
         delete r;
         close(conn);
