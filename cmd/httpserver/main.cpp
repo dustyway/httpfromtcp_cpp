@@ -3,6 +3,7 @@
 #include <cstdio>
 #include "Server.hpp"
 #include "Request.hpp"
+#include "Sha256.hpp"
 
 #define PORT 42069
 
@@ -70,7 +71,7 @@ static void handleRequest(Response::Writer& w, const Request& req) {
         body = BODY_500;
         bodyLen = sizeof(BODY_500) - 1;
         status = Response::StatusInternalServerError;
-    } else if (startsWith(req.getTarget(), "/httpbin/stream")) {
+    } else if (startsWith(req.getTarget(), "/httpbin/")) {
         std::string target = req.getTarget();
         std::string httpbinPath = target.substr(9); // after "/httpbin/"
 
@@ -90,18 +91,33 @@ static void handleRequest(Response::Writer& w, const Request& req) {
                 h.remove("content-length");
                 h.set("transfer-encoding", "chunked");
                 h.replace("content-type", "text/plain");
+                h.set("Trailer", "X-Content-SHA256");
+                h.set("Trailer", "X-Content-Length");
                 w.writeHeaders(h);
 
+                std::string fullBody;
                 char data[32];
                 for (;;) {
                     size_t n = fread(data, 1, sizeof(data), pipe);
                     if (n == 0) {
                         break;
                     }
+                    fullBody.append(data, n);
                     w.writeChunkedBody(data, n);
                 }
-                w.writeChunkedBodyDone();
                 pclose(pipe);
+
+                w.writeBody("0\r\n", 3);
+
+                unsigned char hash[32];
+                Crypto::sha256(fullBody, hash);
+                Headers trailers;
+                trailers.set("X-Content-SHA256", Crypto::toHexStr(hash, 32));
+                std::ostringstream toss;
+                toss << fullBody.size();
+                trailers.set("X-Content-Length", toss.str());
+                w.writeHeaders(trailers);
+                w.writeBody("\r\n\r\n", 4);
             }
         }
     }

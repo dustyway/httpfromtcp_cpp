@@ -5,11 +5,13 @@ set(TESTS_SOURCES
         headers_test.cpp
         request_test.cpp
         response_test.cpp
+        sha256_test.cpp
 #        sanitizer_test.cpp
 )
 
+find_package(OpenSSL REQUIRED)
 add_executable(${TEST_MAIN} ${TESTS_SOURCES})
-target_link_libraries(${TEST_MAIN} PUBLIC ${REQUEST_LIBRARY} ${RESPONSE_LIBRARY} Catch2::Catch2WithMain)
+target_link_libraries(${TEST_MAIN} PUBLIC ${REQUEST_LIBRARY} ${RESPONSE_LIBRARY} ${CRYPTO_LIBRARY} OpenSSL::Crypto Catch2::Catch2WithMain)
 
 #set(RESPONSE_TEST "response_test")
 #add_executable(${RESPONSE_TEST} response_test.cpp)

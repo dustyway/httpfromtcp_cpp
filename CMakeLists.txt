@@ -32,6 +32,7 @@ endif ()
 set(REQUEST_LIBRARY request_lib)
 set(SERVER_LIBRARY server_lib)
 set(RESPONSE_LIBRARY response_lib)
+set(CRYPTO_LIBRARY crypto_lib)
 
 add_subdirectory(cmd)
 add_subdirectory(internal)
