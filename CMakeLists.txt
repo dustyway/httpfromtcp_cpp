@@ -19,6 +19,7 @@ if(ENABLE_TESTING)
 endif ()
 
 set(REQUEST_LIBRARY request_lib)
+set(SERVER_LIBRARY server_lib)
 
 add_subdirectory(cmd)
 add_subdirectory(internal)
