@@ -7,11 +7,6 @@
 
 class Request;
 
-struct HandlerError {
-    Response::StatusCode statusCode;
-    std::string message;
-};
-
 typedef void (*Handler)(Response::Writer& w, const Request& req);
 
 class Server {

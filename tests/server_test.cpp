@@ -133,12 +133,6 @@ struct ServerGuard {
         sigaddset(&mask, SIGTERM);
         sigprocmask(SIG_BLOCK, &mask, NULL);
 
-        // Drain any pending SIGTERM left from a previous test.
-        struct timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 0;
-        sigtimedwait(&mask, NULL, &ts);
-
         std::string err;
         s = Server::serve(TEST_PORT, handleRequest, err);
         if (!s) {

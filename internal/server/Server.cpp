@@ -1,8 +1,6 @@
 #include "Server.hpp"
 #include "Request.hpp"
-#include <cstring>
 #include <cerrno>
-#include <sstream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
@@ -84,6 +82,8 @@ void Server::run() {
         }
     }
 
+    struct signalfd_siginfo fdsi;
+    read(sfd, &fdsi, sizeof(fdsi));
     ::close(sfd);
 }
 
