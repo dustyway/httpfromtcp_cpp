@@ -11,7 +11,13 @@ public:
     std::string get(const std::string& name) const;
     void set(const std::string& name, const std::string& value);
     void replace(const std::string& name, const std::string& value);
-    void forEach(void (*callback)(const std::string&, const std::string&, void*), void* userData) const;
+    template <typename Func>
+    void forEach(Func func) const {
+        for (std::map<std::string, std::string>::const_iterator it = headers.begin();
+             it != headers.end(); ++it) {
+            func(it->first, it->second);
+        }
+    }
 
     // Returns: bytes consumed, done flag, error message (empty if no error)
     struct ParseResult {

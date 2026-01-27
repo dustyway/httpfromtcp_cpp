@@ -29,14 +29,15 @@ public:
     const std::string& getHttpVersion() const;
     const ::Headers& getHeaders() const;
     const std::string& getBody() const;
-    void forEachHeader(void (*callback)(const std::string&, const std::string&, void*), void* userData) const;
+    template <typename Func>
+    void forEachHeader(Func func) const { headers.forEach(func); }
 
     static const char* ERROR_MALFORMED_REQUEST_LINE;
     static const char* ERROR_REQUEST_IN_ERROR_STATE;
 
     // Read and parse a request from a socket
     // Returns NULL on error, sets errorMsg if provided
-    static Request* requestFromSocket(int socketFd, std::string* errorMsg);
+    static Request* requestFromSocket(int socketFd, std::string& errorMsg);
 
 private:
     RequestLine requestLine;
@@ -52,7 +53,7 @@ private:
     // Parse data incrementally - can be called multiple times
     // Returns number of bytes consumed, or -1 on error
     // Sets errorMsg if provided and an error occurs
-    int parse(const std::string& data, std::string* errorMsg);
+    int parse(const std::string& data, std::string& errorMsg);
 
     // Check if parsing is complete (either done or error)
     bool done() const;
@@ -63,8 +64,8 @@ private:
     // Parse request line from buffer
     // Returns bytes consumed (0 if incomplete, -1 on error)
     static int parseRequestLine(const std::string& buffer,
-                                RequestLine* rl,
-                                std::string* errorMsg);
+                                RequestLine& rl,
+                                std::string& errorMsg);
 };
 
 #endif

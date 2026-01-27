@@ -11,7 +11,7 @@ namespace Response {
         StatusInternalServerError = 500
     };
 
-    Headers* getDefaultHeaders(int contentLen);
+    Headers getDefaultHeaders(int contentLen);
     bool writeStatusLine(int fd, StatusCode statusCode);
     bool writeHeaders(int fd, const Headers& h);
 

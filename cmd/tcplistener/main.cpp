@@ -8,9 +8,11 @@
 
 #define PORT 42069
 
-void printHeader(const std::string& name, const std::string& value, void* /*userData*/) {
-    std::cout << "- " << name << ": " << value << std::endl;
-}
+struct HeaderPrinter {
+    void operator()(const std::string& name, const std::string& value) const {
+        std::cout << "- " << name << ": " << value << std::endl;
+    }
+};
 
 int main() {
     int listener = socket(AF_INET, SOCK_STREAM, 0);
@@ -60,7 +62,7 @@ int main() {
         std::cout << "Accepted connection from " << client_ip << ":" << client_port << std::endl;
 
         std::string errorMsg;
-        Request* r = Request::requestFromSocket(conn, &errorMsg);
+        Request* r = Request::requestFromSocket(conn, errorMsg);
         if (r == NULL) {
             std::cerr << "error: " << errorMsg << std::endl;
             close(conn);
@@ -72,7 +74,7 @@ int main() {
         std::cout << "- Target: " << r->getTarget() << std::endl;
         std::cout << "- Version: " << r->getHttpVersion() << std::endl;
         std::cout << "Headers:" << std::endl;
-        r->forEachHeader(printHeader, NULL);
+        r->forEachHeader(HeaderPrinter());
 
         delete r;
         close(conn);

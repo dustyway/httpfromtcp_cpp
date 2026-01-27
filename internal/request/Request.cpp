@@ -38,9 +38,6 @@ bool Request::hasBody() const {
     return length > 0;
 }
 
-void Request::forEachHeader(void (*callback)(const std::string&, const std::string&, void*), void* userData) const {
-    headers.forEach(callback, userData);
-}
 
 bool Request::done() const {
     return state == ParserState::Done || state == ParserState::Error;
@@ -51,8 +48,8 @@ bool Request::error() const {
 }
 
 int Request::parseRequestLine(const std::string& buffer,
-                              RequestLine* rl,
-                              std::string* errorMsg) {
+                              RequestLine& rl,
+                              std::string& errorMsg) {
     std::string::size_type idx = buffer.find(SEPARATOR);
     if (idx == std::string::npos) {
         return 0; // Need more data
@@ -64,30 +61,30 @@ int Request::parseRequestLine(const std::string& buffer,
     // Split by spaces - need exactly 3 parts
     std::string::size_type firstSpace = startLine.find(' ');
     if (firstSpace == std::string::npos) {
-        if (errorMsg) *errorMsg = ERROR_MALFORMED_REQUEST_LINE;
+        errorMsg = ERROR_MALFORMED_REQUEST_LINE;
         return -1;
     }
 
     std::string::size_type secondSpace = startLine.find(' ', firstSpace + 1);
     if (secondSpace == std::string::npos) {
-        if (errorMsg) *errorMsg = ERROR_MALFORMED_REQUEST_LINE;
+        errorMsg = ERROR_MALFORMED_REQUEST_LINE;
         return -1;
     }
 
     // Check no more spaces after secondSpace
     if (startLine.find(' ', secondSpace + 1) != std::string::npos) {
-        if (errorMsg) *errorMsg = ERROR_MALFORMED_REQUEST_LINE;
+        errorMsg = ERROR_MALFORMED_REQUEST_LINE;
         return -1;
     }
 
-    rl->method = startLine.substr(0, firstSpace);
-    rl->requestTarget = startLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
+    rl.method = startLine.substr(0, firstSpace);
+    rl.requestTarget = startLine.substr(firstSpace + 1, secondSpace - firstSpace - 1);
     std::string httpVersionFull = startLine.substr(secondSpace + 1);
 
     // Validate HTTP version format: HTTP/1.1
     std::string::size_type slashPos = httpVersionFull.find('/');
     if (slashPos == std::string::npos) {
-        if (errorMsg) *errorMsg = ERROR_MALFORMED_REQUEST_LINE;
+        errorMsg = ERROR_MALFORMED_REQUEST_LINE;
         return -1;
     }
 
@@ -95,26 +92,26 @@ int Request::parseRequestLine(const std::string& buffer,
     std::string httpVersion = httpVersionFull.substr(slashPos + 1);
 
     if (httpPrefix != "HTTP" || httpVersion != "1.1") {
-        if (errorMsg) *errorMsg = ERROR_MALFORMED_REQUEST_LINE;
+        errorMsg = ERROR_MALFORMED_REQUEST_LINE;
         return -1;
     }
 
-    rl->httpVersion = httpVersion;
+    rl.httpVersion = httpVersion;
     return bytesRead;
 }
 
-int Request::parse(const std::string& data, std::string* errorMsg) {
+int Request::parse(const std::string& data, std::string& errorMsg) {
     int totalRead = 0;
 
     while (true) {
         std::string currentData = data.substr(totalRead);
         switch (state) {
             case ParserState::Error:
-                if (errorMsg) *errorMsg = ERROR_REQUEST_IN_ERROR_STATE;
+                errorMsg = ERROR_REQUEST_IN_ERROR_STATE;
                 return -1;
 
             case ParserState::Init: {
-                int n = parseRequestLine(currentData, &requestLine, errorMsg);
+                int n = parseRequestLine(currentData, requestLine, errorMsg);
                 if (n < 0) {
                     state = ParserState::Error;
                     return -1;
@@ -130,7 +127,7 @@ int Request::parse(const std::string& data, std::string* errorMsg) {
             case ParserState::Headers: {
                 ::Headers::ParseResult result = headers.parse(currentData);
                 if (!result.error.empty()) {
-                    if (errorMsg) *errorMsg = result.error;
+                    errorMsg = result.error;
                     state = ParserState::Error;
                     return -1;
                 }
@@ -168,7 +165,7 @@ int Request::parse(const std::string& data, std::string* errorMsg) {
     }
 }
 
-Request* Request::requestFromSocket(int socketFd, std::string* errorMsg) {
+Request* Request::requestFromSocket(int socketFd, std::string& errorMsg) {
     Request* request = new Request();
 
     char buf[1024];
@@ -177,12 +174,12 @@ Request* Request::requestFromSocket(int socketFd, std::string* errorMsg) {
     while (!request->done()) {
         ssize_t n = recv(socketFd, buf + bufLen, sizeof(buf) - bufLen, 0);
         if (n < 0) {
-            if (errorMsg) *errorMsg = "socket read error";
+            errorMsg = "socket read error";
             delete request;
             return NULL;
         }
         if (n == 0) {
-            if (errorMsg) *errorMsg = "connection closed";
+            errorMsg = "connection closed";
             delete request;
             return NULL;
         }

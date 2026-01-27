@@ -3,18 +3,21 @@
 #include <sstream>
 #include <unistd.h>
 
-static void appendHeader(const std::string& name, const std::string& value, void* userData) {
-    std::string* buf = static_cast<std::string*>(userData);
-    *buf += name + ": " + value + "\r\n";
-}
+struct HeaderAppender {
+    std::string& buf;
+    HeaderAppender(std::string& b) : buf(b) {}
+    void operator()(const std::string& name, const std::string& value) const {
+        buf += name + ": " + value + "\r\n";
+    }
+};
 
-Headers* Response::getDefaultHeaders(int contentLen) {
-    Headers* h = new Headers();
+Headers Response::getDefaultHeaders(int contentLen) {
+    Headers h;
     std::ostringstream oss;
     oss << contentLen;
-    h->set("Content-Length", oss.str());
-    h->set("Connection", "close");
-    h->set("Content-Type", "text/plain");
+    h.set("Content-Length", oss.str());
+    h.set("Connection", "close");
+    h.set("Content-Type", "text/plain");
     return h;
 }
 
@@ -39,7 +42,7 @@ bool Response::writeStatusLine(int fd, StatusCode statusCode) {
 
 bool Response::writeHeaders(int fd, const Headers& h) {
     std::string buf;
-    h.forEach(appendHeader, &buf);
+    h.forEach(HeaderAppender(buf));
     buf += "\r\n";
     ssize_t n = ::write(fd, buf.c_str(), buf.size());
     return n == static_cast<ssize_t>(buf.size());

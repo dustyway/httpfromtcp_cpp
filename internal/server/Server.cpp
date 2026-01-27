@@ -1,7 +1,8 @@
 #include "Server.hpp"
-#include "Response.hpp"
+#include "Request.hpp"
 #include <cstring>
 #include <cerrno>
+#include <sstream>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <sys/epoll.h>
@@ -9,7 +10,7 @@
 #include <signal.h>
 #include <unistd.h>
 
-Server::Server() : closed(false), listenerFd(-1), epollFd(-1) {}
+Server::Server() : closed(false), listenerFd(-1), epollFd(-1), handler(NULL) {}
 
 Server::~Server() {
     if (listenerFd >= 0) {
@@ -21,10 +22,39 @@ Server::~Server() {
 }
 
 void Server::runConnection(int conn) {
-    Headers* h = Response::getDefaultHeaders(0);
-    Response::writeStatusLine(conn, Response::StatusOk);
-    Response::writeHeaders(conn, *h);
-    delete h;
+    Headers headers = Response::getDefaultHeaders(0);
+
+    std::string parseErr;
+    Request* req = Request::requestFromSocket(conn, parseErr);
+    if (req == NULL) {
+        Response::writeStatusLine(conn, Response::StatusBadRequest);
+        Response::writeHeaders(conn, headers);
+        ::close(conn);
+        return;
+    }
+
+    std::string responseBody;
+    HandlerError handlerErr;
+    bool hasError = handler(responseBody, *req, handlerErr);
+
+    std::string body;
+    Response::StatusCode status = Response::StatusOk;
+    if (hasError) {
+        status = handlerErr.statusCode;
+        body = handlerErr.message;
+    } else {
+        body = responseBody;
+    }
+
+    std::ostringstream oss;
+    oss << body.size();
+    headers.replace("Content-Length", oss.str());
+
+    Response::writeStatusLine(conn, status);
+    Response::writeHeaders(conn, headers);
+    ::write(conn, body.c_str(), body.size());
+
+    delete req;
     ::close(conn);
 }
 
@@ -76,10 +106,10 @@ void Server::run() {
     ::close(sfd);
 }
 
-Server* Server::serve(uint16_t port, std::string* errorMsg) {
+Server* Server::serve(uint16_t port, Handler h, std::string& errorMsg) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
-        if (errorMsg) *errorMsg = std::string("socket error: ") + std::strerror(errno);
+        errorMsg = std::string("socket error: ") + std::strerror(errno);
         return NULL;
     }
 
@@ -93,20 +123,20 @@ Server* Server::serve(uint16_t port, std::string* errorMsg) {
     addr.sin_port = htons(port);
 
     if (bind(fd, reinterpret_cast<struct sockaddr*>(&addr), sizeof(addr)) < 0) {
-        if (errorMsg) *errorMsg = std::string("bind error: ") + std::strerror(errno);
+        errorMsg = std::string("bind error: ") + std::strerror(errno);
         ::close(fd);
         return NULL;
     }
 
     if (listen(fd, 5) < 0) {
-        if (errorMsg) *errorMsg = std::string("listen error: ") + std::strerror(errno);
+        errorMsg = std::string("listen error: ") + std::strerror(errno);
         ::close(fd);
         return NULL;
     }
 
     int epfd = epoll_create(1);
     if (epfd < 0) {
-        if (errorMsg) *errorMsg = std::string("epoll_create error: ") + std::strerror(errno);
+        errorMsg = std::string("epoll_create error: ") + std::strerror(errno);
         ::close(fd);
         return NULL;
     }
@@ -114,6 +144,7 @@ Server* Server::serve(uint16_t port, std::string* errorMsg) {
     Server* s = new Server();
     s->listenerFd = fd;
     s->epollFd = epfd;
+    s->handler = h;
 
     return s;
 }

@@ -9,10 +9,10 @@
 
 // Helper to create a socket pair and parse request from string
 // chunkSize: if > 0, writes data in chunks of this size to simulate chunked network reads
-static Request* parseFromString(const std::string& data, std::string* errorMsg, size_t chunkSize = 0) {
+static Request* parseFromString(const std::string& data, std::string& errorMsg, size_t chunkSize = 0) {
     int fds[2];
     if (socketpair(AF_UNIX, SOCK_STREAM, 0, fds) < 0) {
-        if (errorMsg) *errorMsg = "socketpair failed";
+        errorMsg = "socketpair failed";
         return NULL;
     }
 
@@ -27,7 +27,7 @@ static Request* parseFromString(const std::string& data, std::string* errorMsg, 
         if (written < 0) {
             close(fds[0]);
             close(fds[1]);
-            if (errorMsg) *errorMsg = "write failed";
+            errorMsg = "write failed";
             return NULL;
         }
         totalWritten += written;
@@ -45,7 +45,7 @@ TEST_CASE("Good GET Request line", "[request]") {
     std::string errorMsg;
 
     // Chunked read with 3 bytes per chunk
-    Request* r = parseFromString(data, &errorMsg, 3);
+    Request* r = parseFromString(data, errorMsg, 3);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "GET");
@@ -60,7 +60,7 @@ TEST_CASE("Good GET Request line with path", "[request]") {
     std::string errorMsg;
 
     // Chunked read with 1 byte per chunk
-    Request* r = parseFromString(data, &errorMsg, 1);
+    Request* r = parseFromString(data, errorMsg, 1);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "GET");
@@ -74,7 +74,7 @@ TEST_CASE("Invalid number of parts in request line", "[request]") {
     std::string data = "/coffee HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\nAccept: */*\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -84,7 +84,7 @@ TEST_CASE("Good POST Request with path", "[request]") {
     std::string data = "POST /submit HTTP/1.1\r\nHost: localhost:42069\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "POST");
@@ -98,7 +98,7 @@ TEST_CASE("Good PUT request", "[request]") {
     std::string data = "PUT /resource HTTP/1.1\r\nHost: localhost:42069\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "PUT");
@@ -112,7 +112,7 @@ TEST_CASE("Good DELETE request", "[request]") {
     std::string data = "DELETE /resource/123 HTTP/1.1\r\nHost: localhost:42069\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "DELETE");
@@ -126,7 +126,7 @@ TEST_CASE("HEAD request", "[request]") {
     std::string data = "HEAD / HTTP/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "HEAD");
@@ -138,7 +138,7 @@ TEST_CASE("OPTIONS request with asterisk", "[request]") {
     std::string data = "OPTIONS * HTTP/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "OPTIONS");
@@ -151,7 +151,7 @@ TEST_CASE("PATCH request", "[request]") {
     std::string data = "PATCH /resource HTTP/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "PATCH");
@@ -163,7 +163,7 @@ TEST_CASE("Request with query string", "[request]") {
     std::string data = "GET /search?q=hello&page=1 HTTP/1.1\r\nHost: localhost:42069\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getMethod() == "GET");
@@ -177,7 +177,7 @@ TEST_CASE("Request with fragment", "[request]") {
     std::string data = "GET /page#section HTTP/1.1\r\nHost: localhost:42069\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getTarget() == "/page#section");
@@ -189,7 +189,7 @@ TEST_CASE("Request with deep nested path", "[request]") {
     std::string data = "GET /api/v1/users/123/posts/456/comments HTTP/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getTarget() == "/api/v1/users/123/posts/456/comments");
@@ -201,7 +201,7 @@ TEST_CASE("Request with URL-encoded characters in path", "[request]") {
     std::string data = "GET /path%20with%20spaces HTTP/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getTarget() == "/path%20with%20spaces");
@@ -215,7 +215,7 @@ TEST_CASE("Invalid - empty request", "[request]") {
     std::string data = "";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == "connection closed");
@@ -225,7 +225,7 @@ TEST_CASE("Invalid - no CRLF terminator", "[request]") {
     std::string data = "GET / HTTP/1.1";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == "connection closed");
@@ -237,7 +237,7 @@ TEST_CASE("Invalid - LF only terminator", "[request]") {
     std::string data = "GET / HTTP/1.1\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -247,7 +247,7 @@ TEST_CASE("Invalid - too many spaces in request line", "[request]") {
     std::string data = "GET / extra HTTP/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -257,7 +257,7 @@ TEST_CASE("Invalid - only one part in request line", "[request]") {
     std::string data = "GET\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -269,7 +269,7 @@ TEST_CASE("Invalid version in Request line - no slash", "[request]") {
     std::string data = "GET / HTTP1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -279,7 +279,7 @@ TEST_CASE("Invalid version in Request line - wrong prefix", "[request]") {
     std::string data = "GET / HTTPS/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -289,7 +289,7 @@ TEST_CASE("Invalid method (lowercase) Request line", "[request]") {
     std::string data = "GET / http/1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -299,7 +299,7 @@ TEST_CASE("Invalid version in Request line - HTTP/1.0", "[request]") {
     std::string data = "GET / HTTP/1.0\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -309,7 +309,7 @@ TEST_CASE("Invalid version in Request line - HTTP/2.0", "[request]") {
     std::string data = "GET / HTTP/2.0\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -319,7 +319,7 @@ TEST_CASE("Invalid version in Request line - empty after slash", "[request]") {
     std::string data = "GET / HTTP/\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -329,7 +329,7 @@ TEST_CASE("Invalid version in Request line - extra dot", "[request]") {
     std::string data = "GET / HTTP/1.1.1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -339,7 +339,7 @@ TEST_CASE("Invalid version in Request line - multiple slashes", "[request]") {
     std::string data = "GET / HTTP/1/1\r\nHost: localhost\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == Request::ERROR_MALFORMED_REQUEST_LINE);
@@ -351,7 +351,7 @@ TEST_CASE("Standard Headers", "[request][headers]") {
     std::string errorMsg;
 
     // Chunked read with 3 bytes per chunk (like Go test)
-    Request* r = parseFromString(data, &errorMsg, 3);
+    Request* r = parseFromString(data, errorMsg, 3);
 
     REQUIRE(r != NULL);
     CHECK(r->getHeaders().get("host") == "localhost:42069");
@@ -365,7 +365,7 @@ TEST_CASE("Headers are case-insensitive", "[request][headers]") {
     std::string data = "GET / HTTP/1.1\r\nHost: localhost:42069\r\nUser-Agent: curl/7.81.0\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getHeaders().get("HOST") == "localhost:42069");
@@ -380,7 +380,7 @@ TEST_CASE("Malformed Header - missing colon", "[request][headers]") {
     std::string data = "GET / HTTP/1.1\r\nHost localhost:42069\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r == NULL);
 }
@@ -389,7 +389,7 @@ TEST_CASE("Empty headers section", "[request][headers]") {
     std::string data = "GET / HTTP/1.1\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getHeaders().get("host").empty());
@@ -401,7 +401,7 @@ TEST_CASE("Multiple headers with same name", "[request][headers]") {
     std::string data = "GET / HTTP/1.1\r\nSet-Cookie: a=1\r\nSet-Cookie: b=2\r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getHeaders().get("set-cookie") == "a=1, b=2");
@@ -413,7 +413,7 @@ TEST_CASE("Header value with leading/trailing whitespace", "[request][headers]")
     std::string data = "GET / HTTP/1.1\r\nHost:   localhost:42069  \r\n\r\n";
     std::string errorMsg;
 
-    Request* r = parseFromString(data, &errorMsg);
+    Request* r = parseFromString(data, errorMsg);
 
     REQUIRE(r != NULL);
     CHECK(r->getHeaders().get("host") == "localhost:42069");
@@ -430,7 +430,7 @@ TEST_CASE("Standard Body", "[request][body]") {
     std::string errorMsg;
 
     // Chunked read with 3 bytes per chunk
-    Request* r = parseFromString(data, &errorMsg, 3);
+    Request* r = parseFromString(data, errorMsg, 3);
 
     REQUIRE(r != NULL);
     CHECK(r->getBody() == "hello world!\n");
@@ -446,7 +446,7 @@ TEST_CASE("Body shorter than reported content length", "[request][body]") {
     std::string errorMsg;
 
     // Chunked read with 3 bytes per chunk
-    Request* r = parseFromString(data, &errorMsg, 3);
+    Request* r = parseFromString(data, errorMsg, 3);
 
     REQUIRE(r == NULL);
     CHECK(errorMsg == "connection closed");
