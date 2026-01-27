@@ -4,6 +4,7 @@ set(TEST_MAIN "unit_test")
 set(TESTS_SOURCES
         request_test.cpp
         headers_test.cpp
+        sanitizer_test.cpp
 )
 
 add_executable(${TEST_MAIN} ${TESTS_SOURCES})

@@ -3,6 +3,8 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <cstring>
+#include <iostream>
+
 #include "Request.hpp"
 
 // Helper to create a socket pair and parse request from string
@@ -432,8 +434,7 @@ TEST_CASE("Standard Body", "[request][body]") {
 
     REQUIRE(r != NULL);
     CHECK(r->getBody() == "hello world!\n");
-
-    //delete r;
+    delete r;
 }
 
 TEST_CASE("Body shorter than reported content length", "[request][body]") {
