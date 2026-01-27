@@ -114,6 +114,11 @@ void Headers::set(const std::string& name, const std::string& value) {
     }
 }
 
+void Headers::replace(const std::string& name, const std::string& value) {
+    std::string lowerName = toLower(name);
+    headers[lowerName] = value;
+}
+
 void Headers::forEach(void (*callback)(const std::string&, const std::string&, void*), void* userData) const {
     for (std::map<std::string, std::string>::const_iterator it = headers.begin();
          it != headers.end(); ++it) {

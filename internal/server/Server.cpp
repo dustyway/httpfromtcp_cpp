@@ -1,4 +1,5 @@
 #include "Server.hpp"
+#include "Response.hpp"
 #include <cstring>
 #include <cerrno>
 #include <sys/socket.h>
@@ -20,8 +21,10 @@ Server::~Server() {
 }
 
 void Server::runConnection(int conn) {
-    const char* out = "HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 12\r\n\r\nHello World!";
-    write(conn, out, std::strlen(out));
+    Headers* h = Response::getDefaultHeaders(0);
+    Response::writeStatusLine(conn, Response::StatusOk);
+    Response::writeHeaders(conn, *h);
+    delete h;
     ::close(conn);
 }
 

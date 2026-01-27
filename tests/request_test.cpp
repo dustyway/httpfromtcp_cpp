@@ -433,7 +433,7 @@ TEST_CASE("Standard Body", "[request][body]") {
     REQUIRE(r != NULL);
     CHECK(r->getBody() == "hello world!\n");
 
-    delete r;
+    //delete r;
 }
 
 TEST_CASE("Body shorter than reported content length", "[request][body]") {

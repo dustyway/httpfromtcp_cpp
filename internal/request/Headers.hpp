@@ -10,6 +10,7 @@ public:
 
     std::string get(const std::string& name) const;
     void set(const std::string& name, const std::string& value);
+    void replace(const std::string& name, const std::string& value);
     void forEach(void (*callback)(const std::string&, const std::string&, void*), void* userData) const;
 
     // Returns: bytes consumed, done flag, error message (empty if no error)
