@@ -17,11 +17,11 @@ namespace Response {
     public:
         Writer(int fd);
 
-        bool writeStatusLine(StatusCode statusCode);
-        bool writeHeaders(const Headers& h);
-        bool writeBody(const char* data, size_t len);
-        bool writeChunkedBody(const char* data, size_t len);
-        bool writeChunkedBodyDone();
+        bool writeStatusLine(StatusCode statusCode) const;
+        bool writeHeaders(const Headers& h) const;
+        bool writeBody(const char* data, size_t len) const;
+        bool writeChunkedBody(const char* data, size_t len) const;
+        bool writeChunkedBodyDone() const;
 
     private:
         int fd;

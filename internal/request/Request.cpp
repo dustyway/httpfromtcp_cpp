@@ -3,9 +3,9 @@
 #include <cstring>
 #include <cstdlib>
 
-const char* Request::ERROR_MALFORMED_REQUEST_LINE = "malformed request-line";
-const char* Request::ERROR_REQUEST_IN_ERROR_STATE = "request in error state";
-const char* Request::SEPARATOR = "\r\n";
+const char* const Request::ERROR_MALFORMED_REQUEST_LINE = "malformed request-line";
+const char* const Request::ERROR_REQUEST_IN_ERROR_STATE = "request in error state";
+const char* const Request::SEPARATOR = "\r\n";
 
 Request::Request() : state(ParserState::Init), chunkedRemaining(0) {}
 
@@ -41,7 +41,6 @@ bool Request::hasBody() const {
 bool Request::isChunkedEncoding() const {
     return headers.get("transfer-encoding") == "chunked";
 }
-
 
 bool Request::done() const {
     return state == ParserState::Done || state == ParserState::Error;

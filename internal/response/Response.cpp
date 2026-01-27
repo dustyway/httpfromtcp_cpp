@@ -24,7 +24,7 @@ Headers Response::getDefaultHeaders(int contentLen) {
 
 Response::Writer::Writer(int fd) : fd(fd) {}
 
-bool Response::Writer::writeStatusLine(StatusCode statusCode) {
+bool Response::Writer::writeStatusLine(StatusCode statusCode) const {
     const char* statusLine = NULL;
     switch (statusCode) {
         case StatusOk:
@@ -39,11 +39,12 @@ bool Response::Writer::writeStatusLine(StatusCode statusCode) {
         default:
             return false;
     }
-    ssize_t n = ::write(fd, statusLine, std::strlen(statusLine));
-    return n == static_cast<ssize_t>(std::strlen(statusLine));
+    size_t len = std::strlen(statusLine);
+    ssize_t n = ::write(fd, statusLine, len);
+    return n == static_cast<ssize_t>(len);
 }
 
-bool Response::Writer::writeHeaders(const Headers& h) {
+bool Response::Writer::writeHeaders(const Headers& h) const {
     std::string buf;
     h.forEach(HeaderAppender(buf));
     buf += "\r\n";
@@ -51,12 +52,12 @@ bool Response::Writer::writeHeaders(const Headers& h) {
     return n == static_cast<ssize_t>(buf.size());
 }
 
-bool Response::Writer::writeBody(const char* data, size_t len) {
+bool Response::Writer::writeBody(const char* data, size_t len) const {
     ssize_t n = ::write(fd, data, len);
     return n == static_cast<ssize_t>(len);
 }
 
-bool Response::Writer::writeChunkedBody(const char* data, size_t len) {
+bool Response::Writer::writeChunkedBody(const char* data, size_t len) const {
     char hexBuf[32];
     int hexLen = std::sprintf(hexBuf, "%x\r\n", static_cast<unsigned int>(len));
     if (!writeBody(hexBuf, hexLen)) {
@@ -68,6 +69,6 @@ bool Response::Writer::writeChunkedBody(const char* data, size_t len) {
     return writeBody("\r\n", 2);
 }
 
-bool Response::Writer::writeChunkedBodyDone() {
+bool Response::Writer::writeChunkedBodyDone() const {
     return writeBody("0\r\n\r\n", 5);
 }

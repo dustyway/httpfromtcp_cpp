@@ -2,7 +2,7 @@
 #include <algorithm>
 #include <cctype>
 
-static const char* CRLF = "\r\n";
+static const char* const CRLF = "\r\n";
 static const size_t CRLF_LEN = 2;
 
 Headers::Headers() {}

@@ -63,6 +63,6 @@ TEST_CASE("SHA256 matches OpenSSL at block boundaries", "[crypto][sha256]") {
 TEST_CASE("toHexStr produces correct output", "[crypto][sha256]") {
     unsigned char bytes[] = {0x00, 0x01, 0x0a, 0x0f, 0x10, 0xff, 0xab, 0xcd};
     CHECK(Crypto::toHexStr(bytes, 8) == "00010a0f10ffabcd");
-    CHECK(Crypto::toHexStr(bytes, 0) == "");
+    CHECK(Crypto::toHexStr(bytes, 0).empty());
     CHECK(Crypto::toHexStr(bytes, 1) == "00");
 }

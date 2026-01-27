@@ -36,8 +36,8 @@ public:
     template <typename Func>
     void forEachHeader(Func func) const { headers.forEach(func); }
 
-    static const char* ERROR_MALFORMED_REQUEST_LINE;
-    static const char* ERROR_REQUEST_IN_ERROR_STATE;
+    static const char* const ERROR_MALFORMED_REQUEST_LINE;
+    static const char* const ERROR_REQUEST_IN_ERROR_STATE;
 
     // Read and parse a request from a socket
     // Returns NULL on error, sets errorMsg if provided
@@ -50,7 +50,7 @@ private:
     ParserState::State state;
     int chunkedRemaining;
 
-    static const char* SEPARATOR;
+    static const char* const SEPARATOR;
 
     // Check if request has a body based on Content-Length header
     bool hasBody() const;
