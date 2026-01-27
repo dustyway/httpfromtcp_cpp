@@ -12,8 +12,18 @@ namespace Response {
     };
 
     Headers getDefaultHeaders(int contentLen);
-    bool writeStatusLine(int fd, StatusCode statusCode);
-    bool writeHeaders(int fd, const Headers& h);
+
+    class Writer {
+    public:
+        Writer(int fd);
+
+        bool writeStatusLine(StatusCode statusCode);
+        bool writeHeaders(const Headers& h);
+        bool writeBody(const char* data, size_t len);
+
+    private:
+        int fd;
+    };
 
 }
 

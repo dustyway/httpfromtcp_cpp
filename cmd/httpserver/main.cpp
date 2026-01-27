@@ -1,21 +1,66 @@
 #include <iostream>
+#include <sstream>
 #include "Server.hpp"
 #include "Request.hpp"
 
 #define PORT 42069
 
-static bool handleRequest(std::string& responseBody, const Request& req, HandlerError& error) {
+static const char BODY_200[] =
+    "<html>\n"
+    "  <head>\n"
+    "    <title>200 OK</title>\n"
+    "  </head>\n"
+    "  <body>\n"
+    "    <h1>Success!</h1>\n"
+    "    <p>Your request was an absolute banger.</p>\n"
+    "  </body>\n"
+    "</html>";
+
+static const char BODY_400[] =
+    "<html>\n"
+    "  <head>\n"
+    "    <title>400 Bad Request</title>\n"
+    "  </head>\n"
+    "  <body>\n"
+    "    <h1>Bad Request</h1>\n"
+    "    <p>Your request honestly kinda sucked.</p>\n"
+    "  </body>\n"
+    "</html>";
+
+static const char BODY_500[] =
+    "<html>\n"
+    "  <head>\n"
+    "    <title>500 Internal Server Error</title>\n"
+    "  </head>\n"
+    "  <body>\n"
+    "    <h1>Internal Server Error</h1>\n"
+    "    <p>Okay, you know what? This one is on me.</p>\n"
+    "  </body>\n"
+    "</html>";
+
+static void handleRequest(Response::Writer& w, const Request& req) {
+    Headers h = Response::getDefaultHeaders(0);
+    const char* body = BODY_200;
+    size_t bodyLen = sizeof(BODY_200) - 1;
+    Response::StatusCode status = Response::StatusOk;
+
     if (req.getTarget() == "/yourproblem") {
-        error.statusCode = Response::StatusBadRequest;
-        error.message = "Your problem is not my problem\n";
-        return true;
+        body = BODY_400;
+        bodyLen = sizeof(BODY_400) - 1;
+        status = Response::StatusBadRequest;
     } else if (req.getTarget() == "/myproblem") {
-        error.statusCode = Response::StatusInternalServerError;
-        error.message = "Woopsie, my bad\n";
-        return true;
+        body = BODY_500;
+        bodyLen = sizeof(BODY_500) - 1;
+        status = Response::StatusInternalServerError;
     }
-    responseBody = "All good, frfr\n";
-    return false;
+
+    w.writeStatusLine(status);
+    std::ostringstream oss;
+    oss << bodyLen;
+    h.replace("Content-Length", oss.str());
+    h.replace("Content-Type", "text/html");
+    w.writeHeaders(h);
+    w.writeBody(body, bodyLen);
 }
 
 int main() {

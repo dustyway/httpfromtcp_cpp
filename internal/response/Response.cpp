@@ -21,7 +21,9 @@ Headers Response::getDefaultHeaders(int contentLen) {
     return h;
 }
 
-bool Response::writeStatusLine(int fd, StatusCode statusCode) {
+Response::Writer::Writer(int fd) : fd(fd) {}
+
+bool Response::Writer::writeStatusLine(StatusCode statusCode) {
     const char* statusLine = NULL;
     switch (statusCode) {
         case StatusOk:
@@ -40,10 +42,15 @@ bool Response::writeStatusLine(int fd, StatusCode statusCode) {
     return n == static_cast<ssize_t>(std::strlen(statusLine));
 }
 
-bool Response::writeHeaders(int fd, const Headers& h) {
+bool Response::Writer::writeHeaders(const Headers& h) {
     std::string buf;
     h.forEach(HeaderAppender(buf));
     buf += "\r\n";
     ssize_t n = ::write(fd, buf.c_str(), buf.size());
     return n == static_cast<ssize_t>(buf.size());
+}
+
+bool Response::Writer::writeBody(const char* data, size_t len) {
+    ssize_t n = ::write(fd, data, len);
+    return n == static_cast<ssize_t>(len);
 }

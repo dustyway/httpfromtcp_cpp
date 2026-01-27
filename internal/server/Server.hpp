@@ -12,9 +12,7 @@ struct HandlerError {
     std::string message;
 };
 
-// Handler writes to responseBody on success, fills error on failure.
-// Returns true if there was an error.
-typedef bool (*Handler)(std::string& responseBody, const Request& req, HandlerError& error);
+typedef void (*Handler)(Response::Writer& w, const Request& req);
 
 class Server {
 public:

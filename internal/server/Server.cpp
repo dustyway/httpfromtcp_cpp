@@ -22,37 +22,18 @@ Server::~Server() {
 }
 
 void Server::runConnection(int conn) {
-    Headers headers = Response::getDefaultHeaders(0);
+    Response::Writer w(conn);
 
     std::string parseErr;
     Request* req = Request::requestFromSocket(conn, parseErr);
     if (req == NULL) {
-        Response::writeStatusLine(conn, Response::StatusBadRequest);
-        Response::writeHeaders(conn, headers);
+        w.writeStatusLine(Response::StatusBadRequest);
+        w.writeHeaders(Response::getDefaultHeaders(0));
         ::close(conn);
         return;
     }
 
-    std::string responseBody;
-    HandlerError handlerErr;
-    bool hasError = handler(responseBody, *req, handlerErr);
-
-    std::string body;
-    Response::StatusCode status = Response::StatusOk;
-    if (hasError) {
-        status = handlerErr.statusCode;
-        body = handlerErr.message;
-    } else {
-        body = responseBody;
-    }
-
-    std::ostringstream oss;
-    oss << body.size();
-    headers.replace("Content-Length", oss.str());
-
-    Response::writeStatusLine(conn, status);
-    Response::writeHeaders(conn, headers);
-    ::write(conn, body.c_str(), body.size());
+    handler(w, *req);
 
     delete req;
     ::close(conn);
