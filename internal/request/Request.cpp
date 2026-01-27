@@ -7,7 +7,7 @@ const char* Request::ERROR_MALFORMED_REQUEST_LINE = "malformed request-line";
 const char* Request::ERROR_REQUEST_IN_ERROR_STATE = "request in error state";
 const char* Request::SEPARATOR = "\r\n";
 
-Request::Request() : state(ParserState::Init) {}
+Request::Request() : state(ParserState::Init), chunkedRemaining(0) {}
 
 const std::string& Request::getMethod() const {
     return requestLine.method;
@@ -36,6 +36,10 @@ bool Request::hasBody() const {
     }
     int length = std::atoi(lengthStr.c_str());
     return length > 0;
+}
+
+bool Request::isChunkedEncoding() const {
+    return headers.get("transfer-encoding") == "chunked";
 }
 
 
@@ -136,7 +140,9 @@ int Request::parse(const std::string& data, std::string& errorMsg) {
                 }
                 totalRead += result.bytesConsumed;
                 if (result.done) {
-                    if (hasBody()) {
+                    if (isChunkedEncoding()) {
+                        state = ParserState::ChunkedSize;
+                    } else if (hasBody()) {
                         state = ParserState::Body;
                     } else {
                         state = ParserState::Done;
@@ -157,6 +163,62 @@ int Request::parse(const std::string& data, std::string& errorMsg) {
                     state = ParserState::Done;
                 }
                 return totalRead;
+            }
+
+            case ParserState::ChunkedSize: {
+                std::string::size_type idx = currentData.find(SEPARATOR);
+                if (idx == std::string::npos) {
+                    return totalRead; // Need more data
+                }
+                std::string sizeStr = currentData.substr(0, idx);
+                char* end = NULL;
+                unsigned long chunkSize = std::strtoul(sizeStr.c_str(), &end, 16);
+                if (end == sizeStr.c_str() || *end != '\0') {
+                    errorMsg = "invalid chunk size";
+                    state = ParserState::Error;
+                    return -1;
+                }
+                totalRead += static_cast<int>(idx) + 2; // consume size line + \r\n
+                if (chunkSize == 0) {
+                    state = ParserState::ChunkedDone;
+                } else {
+                    chunkedRemaining = static_cast<int>(chunkSize);
+                    state = ParserState::ChunkedData;
+                }
+                break;
+            }
+
+            case ParserState::ChunkedData: {
+                int available = static_cast<int>(currentData.size());
+                if (available == 0) {
+                    return totalRead; // Need more data
+                }
+                int toConsume = (chunkedRemaining < available) ? chunkedRemaining : available;
+                body += currentData.substr(0, toConsume);
+                totalRead += toConsume;
+                chunkedRemaining -= toConsume;
+                if (chunkedRemaining == 0) {
+                    state = ParserState::ChunkedTrailer;
+                }
+                break;
+            }
+
+            case ParserState::ChunkedTrailer: {
+                if (static_cast<int>(currentData.size()) < 2) {
+                    return totalRead; // Need more data
+                }
+                totalRead += 2; // consume \r\n after chunk data
+                state = ParserState::ChunkedSize;
+                break;
+            }
+
+            case ParserState::ChunkedDone: {
+                if (static_cast<int>(currentData.size()) < 2) {
+                    return totalRead; // Need more data
+                }
+                totalRead += 2; // consume final \r\n
+                state = ParserState::Done;
+                break;
             }
 
             case ParserState::Done:

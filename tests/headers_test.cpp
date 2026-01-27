@@ -158,3 +158,42 @@ TEST_CASE("Missing End of Headers - trailing lone CR", "[headers]") {
     CHECK(result.bytesConsumed == 17);
     CHECK(result.done == false);
 }
+
+TEST_CASE("Remove existing header", "[headers]") {
+    Headers headers;
+    std::string data = "Host: example.com\r\nContent-Type: text/plain\r\n\r\n";
+
+    Headers::ParseResult result = headers.parse(data);
+    result = headers.parse(data.substr(result.bytesConsumed));
+    result = headers.parse(data.substr(19 + 26));
+
+    CHECK(headers.get("Host") == "example.com");
+    CHECK(headers.get("Content-Type") == "text/plain");
+
+    headers.remove("Host");
+    CHECK(headers.get("Host").empty());
+    CHECK(headers.get("Content-Type") == "text/plain");
+}
+
+TEST_CASE("Remove non-existent header does not crash", "[headers]") {
+    Headers headers;
+    std::string data = "Host: example.com\r\n\r\n";
+
+    headers.parse(data);
+    headers.parse(data.substr(19));
+
+    headers.remove("X-Missing");
+    CHECK(headers.get("Host") == "example.com");
+}
+
+TEST_CASE("Remove is case-insensitive", "[headers]") {
+    Headers headers;
+    std::string data = "Content-Type: text/html\r\n\r\n";
+
+    headers.parse(data);
+    headers.parse(data.substr(25));
+
+    headers.remove("CONTENT-TYPE");
+    CHECK(headers.get("Content-Type").empty());
+    CHECK(headers.get("content-type").empty());
+}

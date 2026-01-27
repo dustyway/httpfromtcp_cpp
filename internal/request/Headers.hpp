@@ -11,6 +11,7 @@ public:
     std::string get(const std::string& name) const;
     void set(const std::string& name, const std::string& value);
     void replace(const std::string& name, const std::string& value);
+    void remove(const std::string& name);
     template <typename Func>
     void forEach(Func func) const {
         for (std::map<std::string, std::string>::const_iterator it = headers.begin();

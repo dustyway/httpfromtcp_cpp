@@ -1,6 +1,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <string>
 #include <cstring>
+#include <cstdio>
+#include <cstdlib>
 #include <sstream>
 #include <pthread.h>
 #include <csignal>
@@ -61,6 +63,27 @@ static void handleRequest(Response::Writer& w, const Request& req) {
         body = BODY_500;
         bodyLen = sizeof(BODY_500) - 1;
         status = Response::StatusInternalServerError;
+    } else if (req.getTarget() == "/chunked") {
+        w.writeStatusLine(Response::StatusOk);
+        h.remove("content-length");
+        h.set("transfer-encoding", "chunked");
+        h.replace("content-type", "text/plain");
+        w.writeHeaders(h);
+
+        FILE* pipe = popen("printf 'Hello, chunked world!'", "r");
+        if (pipe != NULL) {
+            char data[8];
+            for (;;) {
+                size_t n = fread(data, 1, sizeof(data), pipe);
+                if (n == 0) {
+                    break;
+                }
+                w.writeChunkedBody(data, n);
+            }
+            w.writeChunkedBodyDone();
+            pclose(pipe);
+        }
+        return;
     }
 
     std::ostringstream oss;
@@ -186,4 +209,47 @@ TEST_CASE("GET /myproblem returns 500 Internal Server Error", "[server]") {
     CHECK(resp.find("HTTP/1.1 500 Internal Server Error\r\n") != std::string::npos);
     CHECK(resp.find("content-type: text/html\r\n") != std::string::npos);
     CHECK(resp.find(BODY_500) != std::string::npos);
+}
+
+static std::string decodeChunked(const std::string& body) {
+    std::string decoded;
+    size_t pos = 0;
+    while (pos < body.size()) {
+        size_t crlfPos = body.find("\r\n", pos);
+        if (crlfPos == std::string::npos) {
+            break;
+        }
+        std::string hexStr = body.substr(pos, crlfPos - pos);
+        unsigned long chunkSize = std::strtoul(hexStr.c_str(), NULL, 16);
+        if (chunkSize == 0) {
+            break;
+        }
+        size_t dataStart = crlfPos + 2;
+        decoded.append(body, dataStart, chunkSize);
+        pos = dataStart + chunkSize + 2; // skip data + \r\n
+    }
+    return decoded;
+}
+
+TEST_CASE("GET /chunked returns chunked transfer encoding", "[server]") {
+    ServerGuard server;
+    REQUIRE(server.s != NULL);
+
+    std::string resp = sendRequest(TEST_PORT, "/chunked");
+    REQUIRE_FALSE(resp.empty());
+
+    CHECK(resp.find("HTTP/1.1 200 OK\r\n") != std::string::npos);
+    CHECK(resp.find("transfer-encoding: chunked\r\n") != std::string::npos);
+
+    // Extract body (after \r\n\r\n)
+    size_t bodyStart = resp.find("\r\n\r\n");
+    REQUIRE(bodyStart != std::string::npos);
+    std::string body = resp.substr(bodyStart + 4);
+
+    // Verify terminal chunk is present
+    CHECK(body.find("0\r\n\r\n") != std::string::npos);
+
+    // Decode and verify content
+    std::string decoded = decodeChunked(body);
+    CHECK(decoded == "Hello, chunked world!");
 }

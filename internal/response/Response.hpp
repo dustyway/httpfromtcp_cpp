@@ -20,6 +20,8 @@ namespace Response {
         bool writeStatusLine(StatusCode statusCode);
         bool writeHeaders(const Headers& h);
         bool writeBody(const char* data, size_t len);
+        bool writeChunkedBody(const char* data, size_t len);
+        bool writeChunkedBodyDone();
 
     private:
         int fd;

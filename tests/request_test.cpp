@@ -451,3 +451,68 @@ TEST_CASE("Body shorter than reported content length", "[request][body]") {
     REQUIRE(r == NULL);
     CHECK(errorMsg == "connection closed");
 }
+
+TEST_CASE("Single chunked body", "[request][chunked]") {
+    std::string data = "POST /upload HTTP/1.1\r\n"
+                       "Host: localhost:42069\r\n"
+                       "Transfer-Encoding: chunked\r\n"
+                       "\r\n"
+                       "5\r\nHello\r\n0\r\n\r\n";
+    std::string errorMsg;
+
+    Request* r = parseFromString(data, errorMsg);
+
+    REQUIRE(r != NULL);
+    CHECK(r->getBody() == "Hello");
+    delete r;
+}
+
+TEST_CASE("Multiple chunks with hex sizes", "[request][chunked]") {
+    // a = 10 in hex, 1a = 26 in hex
+    std::string data = "POST /upload HTTP/1.1\r\n"
+                       "Host: localhost:42069\r\n"
+                       "Transfer-Encoding: chunked\r\n"
+                       "\r\n"
+                       "a\r\n0123456789\r\n"
+                       "1a\r\nabcdefghijklmnopqrstuvwxyz\r\n"
+                       "0\r\n\r\n";
+    std::string errorMsg;
+
+    Request* r = parseFromString(data, errorMsg);
+
+    REQUIRE(r != NULL);
+    CHECK(r->getBody() == "0123456789abcdefghijklmnopqrstuvwxyz");
+    delete r;
+}
+
+TEST_CASE("Chunked body with 1-byte network reads", "[request][chunked]") {
+    std::string data = "POST /upload HTTP/1.1\r\n"
+                       "Host: localhost:42069\r\n"
+                       "Transfer-Encoding: chunked\r\n"
+                       "\r\n"
+                       "5\r\nHello\r\n"
+                       "8\r\n World!\n\r\n"
+                       "0\r\n\r\n";
+    std::string errorMsg;
+
+    Request* r = parseFromString(data, errorMsg, 1);
+
+    REQUIRE(r != NULL);
+    CHECK(r->getBody() == "Hello World!\n");
+    delete r;
+}
+
+TEST_CASE("Empty chunked body", "[request][chunked]") {
+    std::string data = "POST /upload HTTP/1.1\r\n"
+                       "Host: localhost:42069\r\n"
+                       "Transfer-Encoding: chunked\r\n"
+                       "\r\n"
+                       "0\r\n\r\n";
+    std::string errorMsg;
+
+    Request* r = parseFromString(data, errorMsg);
+
+    REQUIRE(r != NULL);
+    CHECK(r->getBody().empty());
+    delete r;
+}

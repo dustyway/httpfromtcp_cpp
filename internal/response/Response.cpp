@@ -1,5 +1,6 @@
 #include "Response.hpp"
 #include <cstring>
+#include <cstdio>
 #include <sstream>
 #include <unistd.h>
 
@@ -53,4 +54,20 @@ bool Response::Writer::writeHeaders(const Headers& h) {
 bool Response::Writer::writeBody(const char* data, size_t len) {
     ssize_t n = ::write(fd, data, len);
     return n == static_cast<ssize_t>(len);
+}
+
+bool Response::Writer::writeChunkedBody(const char* data, size_t len) {
+    char hexBuf[32];
+    int hexLen = std::sprintf(hexBuf, "%x\r\n", static_cast<unsigned int>(len));
+    if (!writeBody(hexBuf, hexLen)) {
+        return false;
+    }
+    if (!writeBody(data, len)) {
+        return false;
+    }
+    return writeBody("\r\n", 2);
+}
+
+bool Response::Writer::writeChunkedBodyDone() {
+    return writeBody("0\r\n\r\n", 5);
 }

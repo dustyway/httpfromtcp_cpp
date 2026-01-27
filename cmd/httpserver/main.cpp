@@ -1,5 +1,6 @@
 #include <iostream>
 #include <sstream>
+#include <cstdio>
 #include "Server.hpp"
 #include "Request.hpp"
 
@@ -38,6 +39,23 @@ static const char BODY_500[] =
     "  </body>\n"
     "</html>";
 
+static bool isSafePath(const std::string& path) {
+    for (size_t i = 0; i < path.size(); ++i) {
+        char c = path[i];
+        if (!((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+              (c >= '0' && c <= '9') || c == '/' || c == '.' ||
+              c == '-' || c == '_')) {
+            return false;
+        }
+    }
+    return !path.empty();
+}
+
+static bool startsWith(const std::string& str, const std::string& prefix) {
+    if (str.size() < prefix.size()) return false;
+    return str.compare(0, prefix.size(), prefix) == 0;
+}
+
 static void handleRequest(Response::Writer& w, const Request& req) {
     Headers h = Response::getDefaultHeaders(0);
     const char* body = BODY_200;
@@ -52,13 +70,47 @@ static void handleRequest(Response::Writer& w, const Request& req) {
         body = BODY_500;
         bodyLen = sizeof(BODY_500) - 1;
         status = Response::StatusInternalServerError;
+    } else if (startsWith(req.getTarget(), "/httpbin/stream")) {
+        std::string target = req.getTarget();
+        std::string httpbinPath = target.substr(9); // after "/httpbin/"
+
+        if (!isSafePath(httpbinPath)) {
+            body = BODY_500;
+            bodyLen = sizeof(BODY_500) - 1;
+            status = Response::StatusInternalServerError;
+        } else {
+            std::string cmd = "curl -s https://httpbin.org/" + httpbinPath;
+            FILE* pipe = popen(cmd.c_str(), "r");
+            if (pipe == NULL) {
+                body = BODY_500;
+                bodyLen = sizeof(BODY_500) - 1;
+                status = Response::StatusInternalServerError;
+            } else {
+                w.writeStatusLine(Response::StatusOk);
+                h.remove("content-length");
+                h.set("transfer-encoding", "chunked");
+                h.replace("content-type", "text/plain");
+                w.writeHeaders(h);
+
+                char data[32];
+                for (;;) {
+                    size_t n = fread(data, 1, sizeof(data), pipe);
+                    if (n == 0) {
+                        break;
+                    }
+                    w.writeChunkedBody(data, n);
+                }
+                w.writeChunkedBodyDone();
+                pclose(pipe);
+            }
+        }
     }
 
-    w.writeStatusLine(status);
     std::ostringstream oss;
     oss << bodyLen;
     h.replace("Content-Length", oss.str());
     h.replace("Content-Type", "text/html");
+    w.writeStatusLine(status);
     w.writeHeaders(h);
     w.writeBody(body, bodyLen);
 }

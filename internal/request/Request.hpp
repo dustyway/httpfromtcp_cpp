@@ -10,7 +10,11 @@ namespace ParserState {
         Headers,
         Body,
         Done,
-        Error
+        Error,
+        ChunkedSize,
+        ChunkedData,
+        ChunkedTrailer,
+        ChunkedDone
     };
 }
 
@@ -44,11 +48,15 @@ private:
     ::Headers headers;
     std::string body;
     ParserState::State state;
+    int chunkedRemaining;
 
     static const char* SEPARATOR;
 
     // Check if request has a body based on Content-Length header
     bool hasBody() const;
+
+    // Check if Transfer-Encoding is chunked
+    bool isChunkedEncoding() const;
 
     // Parse data incrementally - can be called multiple times
     // Returns number of bytes consumed, or -1 on error

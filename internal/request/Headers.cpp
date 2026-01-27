@@ -119,7 +119,10 @@ void Headers::replace(const std::string& name, const std::string& value) {
     headers[lowerName] = value;
 }
 
-
+void Headers::remove(const std::string& name) {
+    std::string lowerName = toLower(name);
+    headers.erase(lowerName);
+}
 
 Headers::ParseResult Headers::parse(const std::string& data) {
     // Find CRLF
