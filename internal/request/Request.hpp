@@ -8,6 +8,7 @@ namespace ParserState {
     enum State {
         Init,
         Headers,
+        Body,
         Done,
         Error
     };
@@ -27,6 +28,7 @@ public:
     const std::string& getTarget() const;
     const std::string& getHttpVersion() const;
     const ::Headers& getHeaders() const;
+    const std::string& getBody() const;
     void forEachHeader(void (*callback)(const std::string&, const std::string&, void*), void* userData) const;
 
     static const char* ERROR_MALFORMED_REQUEST_LINE;
@@ -39,9 +41,13 @@ public:
 private:
     RequestLine requestLine;
     ::Headers headers;
+    std::string body;
     ParserState::State state;
 
     static const char* SEPARATOR;
+
+    // Check if request has a body based on Content-Length header
+    bool hasBody() const;
 
     // Parse data incrementally - can be called multiple times
     // Returns number of bytes consumed, or -1 on error

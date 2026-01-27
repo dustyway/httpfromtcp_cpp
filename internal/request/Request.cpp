@@ -1,6 +1,7 @@
 #include "Request.hpp"
 #include <sys/socket.h>
 #include <cstring>
+#include <cstdlib>
 
 const char* Request::ERROR_MALFORMED_REQUEST_LINE = "malformed request-line";
 const char* Request::ERROR_REQUEST_IN_ERROR_STATE = "request in error state";
@@ -22,6 +23,19 @@ const std::string& Request::getHttpVersion() const {
 
 const Headers& Request::getHeaders() const {
     return headers;
+}
+
+const std::string& Request::getBody() const {
+    return body;
+}
+
+bool Request::hasBody() const {
+    std::string lengthStr = headers.get("content-length");
+    if (lengthStr.empty()) {
+        return false;
+    }
+    int length = std::atoi(lengthStr.c_str());
+    return length > 0;
 }
 
 void Request::forEachHeader(void (*callback)(const std::string&, const std::string&, void*), void* userData) const {
@@ -125,9 +139,27 @@ int Request::parse(const std::string& data, std::string* errorMsg) {
                 }
                 totalRead += result.bytesConsumed;
                 if (result.done) {
-                    state = ParserState::Done;
+                    if (hasBody()) {
+                        state = ParserState::Body;
+                    } else {
+                        state = ParserState::Done;
+                    }
                 }
                 break;
+            }
+
+            case ParserState::Body: {
+                int length = std::atoi(headers.get("content-length").c_str());
+                int bodyLen = static_cast<int>(body.size());
+                int dataLen = static_cast<int>(currentData.size());
+                int remaining = (length - bodyLen < dataLen) ? (length - bodyLen) : dataLen;
+                body += currentData.substr(0, remaining);
+                totalRead += remaining;
+
+                if (static_cast<int>(body.size()) == length) {
+                    state = ParserState::Done;
+                }
+                return totalRead;
             }
 
             case ParserState::Done:

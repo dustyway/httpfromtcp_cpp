@@ -418,3 +418,35 @@ TEST_CASE("Header value with leading/trailing whitespace", "[request][headers]")
 
     delete r;
 }
+
+TEST_CASE("Standard Body", "[request][body]") {
+    std::string data = "POST /submit HTTP/1.1\r\n"
+                       "Host: localhost:42069\r\n"
+                       "Content-Length: 13\r\n"
+                       "\r\n"
+                       "hello world!\n";
+    std::string errorMsg;
+
+    // Chunked read with 3 bytes per chunk
+    Request* r = parseFromString(data, &errorMsg, 3);
+
+    REQUIRE(r != NULL);
+    CHECK(r->getBody() == "hello world!\n");
+
+    delete r;
+}
+
+TEST_CASE("Body shorter than reported content length", "[request][body]") {
+    std::string data = "POST /submit HTTP/1.1\r\n"
+                       "Host: localhost:42069\r\n"
+                       "Content-Length: 20\r\n"
+                       "\r\n"
+                       "partial content";
+    std::string errorMsg;
+
+    // Chunked read with 3 bytes per chunk
+    Request* r = parseFromString(data, &errorMsg, 3);
+
+    REQUIRE(r == NULL);
+    CHECK(errorMsg == "connection closed");
+}
