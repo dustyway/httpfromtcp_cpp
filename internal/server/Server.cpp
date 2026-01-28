@@ -31,7 +31,7 @@ void Server::runConnection(int conn) {
         return;
     }
 
-    handler(w, *req);
+    handler->handle(w, *req);
 
     delete req;
     ::close(conn);
@@ -87,7 +87,7 @@ void Server::run() {
     ::close(sfd);
 }
 
-Server* Server::serve(uint16_t port, Handler h, std::string& errorMsg) {
+Server* Server::serve(uint16_t port, RequestHandler& h, std::string& errorMsg) {
     int fd = socket(AF_INET, SOCK_STREAM, 0);
     if (fd < 0) {
         errorMsg = std::string("socket error: ") + std::strerror(errno);
@@ -125,7 +125,7 @@ Server* Server::serve(uint16_t port, Handler h, std::string& errorMsg) {
     Server* s = new Server();
     s->listenerFd = fd;
     s->epollFd = epfd;
-    s->handler = h;
+    s->handler = &h;
 
     return s;
 }

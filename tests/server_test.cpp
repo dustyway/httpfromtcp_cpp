@@ -11,8 +11,9 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
-#include "Server.hpp"
+#include "Router.hpp"
 #include "Request.hpp"
+#include "Server.hpp"
 
 #define TEST_PORT 18080
 
@@ -49,50 +50,51 @@ static const char BODY_500[] =
     "  </body>\n"
     "</html>";
 
-static void handleRequest(Response::Writer& w, const Request& req) {
+static void sendHtml(Response::Writer& w, Response::StatusCode status,
+                     const char* body, size_t bodyLen) {
     Headers h = Response::getDefaultHeaders(0);
-    const char* body = BODY_200;
-    size_t bodyLen = sizeof(BODY_200) - 1;
-    Response::StatusCode status = Response::StatusOk;
-
-    if (req.getTarget() == "/yourproblem") {
-        body = BODY_400;
-        bodyLen = sizeof(BODY_400) - 1;
-        status = Response::StatusBadRequest;
-    } else if (req.getTarget() == "/myproblem") {
-        body = BODY_500;
-        bodyLen = sizeof(BODY_500) - 1;
-        status = Response::StatusInternalServerError;
-    } else if (req.getTarget() == "/chunked") {
-        w.writeStatusLine(Response::StatusOk);
-        h.remove("content-length");
-        h.set("transfer-encoding", "chunked");
-        h.replace("content-type", "text/plain");
-        w.writeHeaders(h);
-
-        FILE* pipe = popen("printf 'Hello, chunked world!'", "r");
-        if (pipe != NULL) {
-            char data[8];
-            for (;;) {
-                size_t n = fread(data, 1, sizeof(data), pipe);
-                if (n == 0) {
-                    break;
-                }
-                w.writeChunkedBody(data, n);
-            }
-            w.writeChunkedBodyDone();
-            pclose(pipe);
-        }
-        return;
-    }
-
     std::ostringstream oss;
     oss << bodyLen;
-    w.writeStatusLine(status);
     h.replace("Content-Length", oss.str());
     h.replace("Content-Type", "text/html");
+    w.writeStatusLine(status);
     w.writeHeaders(h);
     w.writeBody(body, bodyLen);
+}
+
+static void handleDefault(Response::Writer& w, const Request&) {
+    sendHtml(w, Response::StatusOk, BODY_200, sizeof(BODY_200) - 1);
+}
+
+static void handle400(Response::Writer& w, const Request&) {
+    sendHtml(w, Response::StatusBadRequest, BODY_400, sizeof(BODY_400) - 1);
+}
+
+static void handle500(Response::Writer& w, const Request&) {
+    sendHtml(w, Response::StatusInternalServerError, BODY_500, sizeof(BODY_500) - 1);
+}
+
+static void handleChunked(Response::Writer& w, const Request&) {
+    Headers h = Response::getDefaultHeaders(0);
+    h.remove("content-length");
+    h.set("transfer-encoding", "chunked");
+    h.replace("content-type", "text/plain");
+    w.writeStatusLine(Response::StatusOk);
+    w.writeHeaders(h);
+
+    FILE* pipe = popen("printf 'Hello, chunked world!'", "r");
+    if (pipe != NULL) {
+        char data[8];
+        for (;;) {
+            size_t n = fread(data, 1, sizeof(data), pipe);
+            if (n == 0) {
+                break;
+            }
+            w.writeChunkedBody(data, n);
+        }
+        w.writeChunkedBodyDone();
+        pclose(pipe);
+    }
 }
 
 static void* serverThread(void* arg) {
@@ -146,9 +148,15 @@ static std::string sendRequest(uint16_t port, const std::string& path) {
 // RAII wrapper: starts the server in a pthread, tears it down via SIGTERM.
 struct ServerGuard {
     Server* s;
+    Router router;
     pthread_t tid;
 
     ServerGuard() : s(NULL) {
+        router.get("/yourproblem", handle400);
+        router.get("/myproblem", handle500);
+        router.get("/chunked", handleChunked);
+        router.setDefault(handleDefault);
+
         // Block SIGINT/SIGTERM so only the server's signalfd picks them up.
         sigset_t mask;
         sigemptyset(&mask);
@@ -157,7 +165,7 @@ struct ServerGuard {
         sigprocmask(SIG_BLOCK, &mask, NULL);
 
         std::string err;
-        s = Server::serve(TEST_PORT, handleRequest, err);
+        s = Server::serve(TEST_PORT, router, err);
         if (!s) {
             return;
         }

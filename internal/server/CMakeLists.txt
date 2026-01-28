@@ -1,5 +1,6 @@
 set(SERVER_SOURCES
         Server.cpp
+        Router.cpp
 )
 
 add_library(${SERVER_LIBRARY} STATIC
