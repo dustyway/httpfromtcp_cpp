@@ -4,7 +4,7 @@ static unsigned int rotr(unsigned int x, int n) {
     return (x >> n) | (x << (32 - n));
 }
 
-void Crypto::sha256(const std::string& input, unsigned char hash[32]) {
+void Crypto::sha256(const unsigned char* data, size_t len, unsigned char hash[32]) {
     static const unsigned int k[64] = {
         0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
         0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -24,18 +24,18 @@ void Crypto::sha256(const std::string& input, unsigned char hash[32]) {
         0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2
     };
 
-    size_t len = input.size();
     size_t padded_len = len + 1;
     while (padded_len % 64 != 56) padded_len++;
     padded_len += 8;
 
-    std::string msg(padded_len, '\0');
-    for (size_t i = 0; i < len; i++) msg[i] = input[i];
-    msg[len] = '\x80';
+    unsigned char* msg = new unsigned char[padded_len];
+    for (size_t i = 0; i < padded_len; i++) msg[i] = 0;
+    for (size_t i = 0; i < len; i++) msg[i] = data[i];
+    msg[len] = 0x80;
 
     unsigned long long bit_len = (unsigned long long)len * 8;
     for (int i = 0; i < 8; i++) {
-        msg[padded_len - 1 - i] = (char)(unsigned char)(bit_len >> (i * 8));
+        msg[padded_len - 1 - i] = (unsigned char)(bit_len >> (i * 8));
     }
 
     unsigned int h0 = 0x6a09e667, h1 = 0xbb67ae85;
@@ -46,10 +46,10 @@ void Crypto::sha256(const std::string& input, unsigned char hash[32]) {
     for (size_t offset = 0; offset < padded_len; offset += 64) {
         unsigned int w[64];
         for (int i = 0; i < 16; i++) {
-            w[i] = ((unsigned int)(unsigned char)msg[offset + i*4] << 24)
-                 | ((unsigned int)(unsigned char)msg[offset + i*4+1] << 16)
-                 | ((unsigned int)(unsigned char)msg[offset + i*4+2] << 8)
-                 | ((unsigned int)(unsigned char)msg[offset + i*4+3]);
+            w[i] = ((unsigned int)msg[offset + i*4] << 24)
+                 | ((unsigned int)msg[offset + i*4+1] << 16)
+                 | ((unsigned int)msg[offset + i*4+2] << 8)
+                 | ((unsigned int)msg[offset + i*4+3]);
         }
         for (int i = 16; i < 64; i++) {
             unsigned int s0 = rotr(w[i-15], 7) ^ rotr(w[i-15], 18) ^ (w[i-15] >> 3);
@@ -76,6 +76,8 @@ void Crypto::sha256(const std::string& input, unsigned char hash[32]) {
         h4 += e; h5 += f; h6 += g; h7 += hh;
     }
 
+    delete[] msg;
+
     unsigned int hvals[8] = {h0, h1, h2, h3, h4, h5, h6, h7};
     for (int i = 0; i < 8; i++) {
         hash[i*4]   = (unsigned char)(hvals[i] >> 24);
@@ -83,6 +85,10 @@ void Crypto::sha256(const std::string& input, unsigned char hash[32]) {
         hash[i*4+2] = (unsigned char)(hvals[i] >> 8);
         hash[i*4+3] = (unsigned char)(hvals[i]);
     }
+}
+
+void Crypto::sha256(const std::string& input, unsigned char hash[32]) {
+    sha256(reinterpret_cast<const unsigned char*>(input.data()), input.size(), hash);
 }
 
 std::string Crypto::toHexStr(const unsigned char* bytes, size_t len) {
