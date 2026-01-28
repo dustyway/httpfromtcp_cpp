@@ -161,7 +161,7 @@ TEST_CASE("BigInt modPow matches OpenSSL BN_mod_exp", "[crypto][bigint]") {
 
     unsigned char osslBytes[32];
     std::memset(osslBytes, 0, 32);
-    int osslLen = BN_bn2bin(bnResult, osslBytes + (32 - BN_num_bytes(bnResult)));
+    BN_bn2bin(bnResult, osslBytes + (32 - BN_num_bytes(bnResult)));
 
     unsigned char ourBytes[32];
     result.toBytes(ourBytes, 32);

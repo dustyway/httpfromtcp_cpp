@@ -105,7 +105,6 @@ void BigInt::divmod(const BigInt& a, const BigInt& b, BigInt& q, BigInt& r) {
     }
 
     size_t aBits = a.bitLength();
-    size_t bBits = b.bitLength();
 
     r = BigInt();
     q = BigInt();
